@@ -1,33 +1,44 @@
 import pandas as pd
 import numpy as np
-from sklearn.linear_model import LogisticRegression
+from sklearn.neural_network import MLPClassifier
 from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, roc_auc_score
-import warnings
-warnings.filterwarnings("ignore")
 
-def entrenar_modelo():
-    df = pd.read_csv("data/clientes.csv")
-    X = df[["edad","ingresos","monto_prestamo","deuda_actual","historial_pagos","meses_empleo"]]
-    y = df["default"]
 
+def entrenar_red_neuronal(df):
+    """
+    Entrena un Perceptrón Multicapa (MLP).
+    Las redes neuronales superan a la regresión logística al capturar
+    interacciones no lineales entre las variables financieras.
+    """
+    # Definimos las variables de entrada y el objetivo
+    X = df[['ingresos', 'edad', 'deuda', 'score']]
+    y = df['default']
+
+    # Escalado de datos: Crucial para que la Red Neuronal converja correctamente
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
 
-    X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2, random_state=42)
+    # Arquitectura: 12 neuronas en capa 1, 8 en capa 2.
+    # Usamos activación ReLU para flexibilidad estadística.
+    mlp = MLPClassifier(
+        hidden_layer_sizes=(12, 8),
+        activation='relu',
+        solver='adam',
+        max_iter=1000,
+        random_state=42
+    )
 
-    modelo = LogisticRegression(random_state=42)
-    modelo.fit(X_train, y_train)
+    mlp.fit(X_scaled, y)
+    return mlp, scaler
 
-    acc = accuracy_score(y_test, modelo.predict(X_test))
-    auc = roc_auc_score(y_test, modelo.predict_proba(X_test)[:,1])
 
-    return modelo, scaler, acc, auc
+def predecir_individual(modelo, scaler, datos_cliente):
+    """
+    Recibe una lista de datos y devuelve la probabilidad de impago.
+    """
+    df_cliente = pd.DataFrame([datos_cliente], columns=['ingresos', 'edad', 'deuda', 'score'])
+    datos_escalados = scaler.transform(df_cliente)
 
-def predecir(modelo, scaler, edad, ingresos, monto, deuda, historial, meses):
-    X = pd.DataFrame([[edad, ingresos, monto, deuda, historial, meses]],
-                     columns=["edad","ingresos","monto_prestamo","deuda_actual","historial_pagos","meses_empleo"])
-    X_scaled = scaler.transform(X)
-    prob = modelo.predict_proba(X_scaled)[0][1]
-    return prob
+    # Retorna la probabilidad del evento 1 (Default)
+    probabilidad = modelo.predict_proba(datos_escalados)[0][1]
+    return probabilidad
